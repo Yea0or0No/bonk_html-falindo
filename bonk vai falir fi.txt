@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bonk.io Prototype</title>
+  <!-- Import p5.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <!-- Import Matter.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+<script>
+  // Engine and world from Matter.js
+  let Engine = Matter.Engine,
+      Render = Matter.Render,
+      World = Matter.World,
+      Bodies = Matter.Bodies,
+      Body = Matter.Body,
+      engine;
+
+  let player, ground;
+
+  function setup() {
+    createCanvas(windowWidth, windowHeight);
+
+    // Initialize Matter.js engine
+    engine = Engine.create();
+
+    // Create ground
+    ground = Bodies.rectangle(width / 2, height - 50, width, 20, {
+      isStatic: true
+    });
+
+    // Create player (circle)
+    player = Bodies.circle(300, 300, 25, {
+      restitution: 0.8, // Bounce
+      friction: 0.05
+    });
+
+    // Add bodies to the world
+    World.add(engine.world, [ground, player]);
+
+    // Run the engine
+    Engine.run(engine);
+  }
+
+  function draw() {
+    background(50);
+
+    // Draw ground
+    fill(100);
+    rectMode(CENTER);
+    rect(ground.position.x, ground.position.y, width, 20);
+
+    // Draw player
+    fill(200, 50, 50);
+    ellipse(player.position.x, player.position.y, 50);
+
+    // Player controls
+    if (keyIsDown(LEFT_ARROW)) {
+      Body.applyForce(player, player.position, { x: -0.01, y: 0 });
+    }
+    if (keyIsDown(RIGHT_ARROW)) {
+      Body.applyForce(player, player.position, { x: 0.01, y: 0 });
+    }
+    if (keyIsDown(UP_ARROW)) {
+      Body.applyForce(player, player.position, { x: 0, y: -0.02 });
+    }
+  }
+
+  function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+    // Adjust ground position to the new width
+    Body.setPosition(ground, { x: width / 2, y: height - 50 });
+  }
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bonk.io Modes Prototype</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+<script>
+  let Engine = Matter.Engine,
+      Render = Matter.Render,
+      World = Matter.World,
+      Bodies = Matter.Bodies,
+      Body = Matter.Body,
+      Constraint = Matter.Constraint;
+
+  let engine;
+  let player, ground, grapple;
+  let isHeavy = false;
+  let isGrappleActive = false;
+
+  function setup() {
+    createCanvas(windowWidth, windowHeight);
+
+    // Setup Matter.js engine
+    engine = Engine.create();
+
+    // Create ground
+    ground = Bodies.rectangle(width / 2, height - 50, width, 20, {
+      isStatic: true
+    });
+
+    // Create player (circle)
+    player = Bodies.circle(300, 300, 25, {
+      restitution: 0.8,
+      friction: 0.05
+    });
+
+    // Add bodies to the world
+    World.add(engine.world, [ground, player]);
+
+    // Run the engine
+    Engine.run(engine);
+  }
+
+  function draw() {
+    background(30);
+
+    // Draw ground
+    fill(100);
+    rectMode(CENTER);
+    rect(ground.position.x, ground.position.y, width, 20);
+
+    // Draw player
+    fill(200, 50, 50);
+    ellipse(player.position.x, player.position.y, 50);
+
+    // Heavy mode: Increase mass when pressing space
+    if (keyIsDown(32)) { // SPACE key
+      if (!isHeavy) {
+        Body.setMass(player, 10); // Heavier mass
+        isHeavy = true;
+      }
+    } else {
+      if (isHeavy) {
+        Body.setMass(player, 1); // Normal mass
+        isHeavy = false;
+      }
+    }
+
+    // Arrows mode: Apply directional forces
+    if (keyIsDown(LEFT_ARROW)) {
+      Body.applyForce(player, player.position, { x: -0.01, y: 0 });
+    }
+    if (keyIsDown(RIGHT_ARROW)) {
+      Body.applyForce(player, player.position, { x: 0.01, y: 0 });
+    }
+    if (keyIsDown(UP_ARROW)) {
+      Body.applyForce(player, player.position, { x: 0, y: -0.02 });
+    }
+    if (keyIsDown(DOWN_ARROW)) {
+      Body.applyForce(player, player.position, { x: 0, y: 0.02 });
+    }
+
+    // Grapple mode: Shoot and attach to a point
+    if (keyIsDown(71)) { // G key
+      if (!isGrappleActive) {
+        let grapplePoint = { x: mouseX, y: mouseY };
+        grapple = Constraint.create({
+          bodyA: player,
+          pointB: grapplePoint,
+          stiffness: 0.01,
+          length: dist(player.position.x, player.position.y, mouseX, mouseY)
+        });
+        World.add(engine.world, grapple);
+        isGrappleActive = true;
+      }
+    }
+
+    // Release grapple
+    if (!keyIsDown(71) && isGrappleActive) {
+      World.remove(engine.world, grapple);
+      isGrappleActive = false;
+    }
+
+    // Draw grapple
+    if (isGrappleActive) {
+      stroke(200);
+      line(player.position.x, player.position.y, grapple.pointB.x, grapple.pointB.y);
+    }
+  }
+
+  function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+    Body.setPosition(ground, { x: width / 2, y: height - 50 });
+  }
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bonk.io Mode Selector</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    #menu {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div id="menu">
+  <h1>Choose a Mode</h1>
+  <button onclick="selectMode('classic')">Classic Mode</button>
+  <button onclick="selectMode('arrows')">Arrows Mode</button>
+  <button onclick="selectMode('grapple')">Grapple Mode</button>
+</div>
+<script>
+  let Engine = Matter.Engine,
+      World = Matter.World,
+      Bodies = Matter.Bodies,
+      Body = Matter.Body,
+      Constraint = Matter.Constraint;
+
+  let engine, player, ground, grapple;
+  let isHeavy = false;
+  let isGrappleActive = false;
+  let selectedMode = null; // Store the selected mode
+  let isGameStarted = false;
+
+  function selectMode(mode) {
+    selectedMode = mode;
+    document.getElementById('menu').style.display = 'none';
+    isGameStarted = true;
+    setup();
+  }
+
+  function setup() {
+    if (!isGameStarted) return; // Only setup if the game has started
+
+    createCanvas(windowWidth, windowHeight);
+
+    // Initialize Matter.js engine
+    engine = Engine.create();
+
+    // Create ground
+    ground = Bodies.rectangle(width / 2, height - 50, width, 20, {
+      isStatic: true
+    });
+
+    // Create player (circle)
+    player = Bodies.circle(300, 300, 25, {
+      restitution: 0.8,
+      friction: 0.05
+    });
+
+    // Add bodies to the world
+    World.add(engine.world, [ground, player]);
+
+    // Run the engine
+    Engine.run(engine);
+  }
+
+  function draw() {
+    if (!isGameStarted) return; // Stop rendering if the game hasn't started
+
+    background(30);
+
+    // Draw ground
+    fill(100);
+    rectMode(CENTER);
+    rect(ground.position.x, ground.position.y, width, 20);
+
+    // Draw player
+    fill(200, 50, 50);
+    ellipse(player.position.x, player.position.y, 50);
+
+    // Handle selected mode
+    if (selectedMode === 'classic') {
+      // Classic Mode: No special mechanics
+      if (keyIsDown(LEFT_ARROW)) {
+        Body.applyForce(player, player.position, { x: -0.01, y: 0 });
+      }
+      if (keyIsDown(RIGHT_ARROW)) {
+        Body.applyForce(player, player.position, { x: 0.01, y: 0 });
+      }
+    }
+
+    if (selectedMode === 'arrows') {
+      // Arrows Mode: Apply forces in all directions
+      if (keyIsDown(LEFT_ARROW)) {
+        Body.applyForce(player, player.position, { x: -0.02, y: 0 });
+      }
+      if (keyIsDown(RIGHT_ARROW)) {
+        Body.applyForce(player, player.position, { x: 0.02, y: 0 });
+      }
+      if (keyIsDown(UP_ARROW)) {
+        Body.applyForce(player, player.position, { x: 0, y: -0.02 });
+      }
+      if (keyIsDown(DOWN_ARROW)) {
+        Body.applyForce(player, player.position, { x: 0, y: 0.02 });
+      }
+    }
+
+    if (selectedMode === 'grapple') {
+      // Grapple Mode: Attach to a point with a line
+      if (keyIsDown(71)) { // G key
+        if (!isGrappleActive) {
+          let grapplePoint = { x: mouseX, y: mouseY };
+          grapple = Constraint.create({
+            bodyA: player,
+            pointB: grapplePoint,
+            stiffness: 0.01,
+            length: dist(player.position.x, player.position.y, mouseX, mouseY)
+          });
+          World.add(engine.world, grapple);
+          isGrappleActive = true;
+        }
+      }
+
+      // Release grapple
+      if (!keyIsDown(71) && isGrappleActive) {
+        World.remove(engine.world, grapple);
+        isGrappleActive = false;
+      }
+
+      // Draw grapple
+      if (isGrappleActive) {
+        stroke(200);
+        line(player.position.x, player.position.y, grapple.pointB.x, grapple.pointB.y);
+      }
+    }
+  }
+
+  function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+    Body.setPosition(ground, { x: width / 2, y: height - 50 });
+  }
+</script>
+</body>
+</html>
+
